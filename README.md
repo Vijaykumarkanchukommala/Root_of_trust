@@ -1,171 +1,74 @@
-# Hardware/Firmware Root of Trust (RoT)
-
-> An open-source, highly secure Root of Trust framework engineered to provide an immutable foundation for secure boot, cryptographic validation, and chain-of-trust execution in embedded and custom digital systems.
+# Root of Trust (RoT): Comprehensive Documentation & Conceptual Guide
 
 ---
 
-## 📋 Table of Contents
-* [Overview](#-overview)
-* [System Architecture & Boot Flow](#-system-architecture--boot-flow)
-* [Technical Specifications & Key Features](#-technical-specifications--key-features)
-* [Repository Structure](#-repository-structure)
-* [Getting Started](#-getting-started)
-  * [Prerequisites & Dependencies](#prerequisites--dependencies)
-  * [Cloning and Setup](#cloning-and-setup)
-* [Building, Compiling & Simulation](#-building-compiling--simulation)
-* [Cryptographic & Signing Workflow](#-cryptographic--signing-workflow)
-* [Testing, Verification & Testbenches](#-testing-verification--testbenches)
-* [Security Considerations & Threat Mitigation](#-security-considerations--threat-mitigation)
-* [Contributing](#-contributing)
-* [License](#-license)
+## 1. Introduction & Purpose
+A **Root of Trust (RoT)** is an immutable, hardware-and-software foundation that establishes absolute security for a computing platform. Because it sits at the very bottom of the security hierarchy, its integrity cannot be verified by any underlying layer—it must be implicitly trusted. 
+
+This documentation provides the complete architectural framework, operational flow, and technical specifications for designing a secure Root of Trust system.
 
 ---
 
-## 🔍 Overview
+## 2. Core Architectural Pillars
+A production-grade Root of Trust relies on three interdependent components:
 
-The **Root of Trust (RoT)** is the most critical security subsystem in any modern computing or embedded device. Because it cannot be updated or modified once deployed, it serves as the ultimate anchor for system integrity. 
-
-This repository provides a comprehensive reference implementation split between low-level hardware design modules and secure firmware components. It ensures that every stage of execution—from initial power-on reset (POR) up to the operating system or application layer—is cryptographically verified against tampering, unauthorized modifications, and rollback attacks.
-
----
-
-## 🔄 System Architecture & Boot Flow
-
-The system follows a strict, sequential **Chain of Trust**. Each layer validates the cryptographic signature and integrity of the subsequent layer before transferring program counter control.
-
-```text
-+---------------------------------------------------------------+
-|                STAGE 0: ROOT OF TRUST (RoT)                   |
-|  - Immutable Boot ROM / Fused Public Keys / Hardware FSM     |
-+---------------------------------------------------------------+
-                                |
-                                v (Verifies ECDSA/RSA Signature)
-+---------------------------------------------------------------+
-|               STAGE 1: SECONDARY BOOTLOADER                   |
-|  - Initializing Peripherals / External Flash Controller       |
-+---------------------------------------------------------------+
-                                |
-                                v (Extends Trust Verification)
-+---------------------------------------------------------------+
-|               STAGE 2: OPERATING SYSTEM / KERNEL              |
-|  - Fully Validated Runtime Environment                        |
-+---------------------------------------------------------------+
+```
++-------------------------------------------------------------+
+|                     HARDWARE ROOT OF TRUST                  |
+|  - Immutable Mask ROM / One-Time Programmable (OTP) Fuses  |
+|  - Cryptographic Accelerator & Secure Key Registers        |
++-------------------------------------------------------------+
+                              |
+                              v (Validates)
++-------------------------------------------------------------+
+|                      SECURE BOOT (ROUTINE)                  |
+|  - Cryptographic Signature Verification (ECDSA / RSA)       |
+|  - Anti-Rollback Monotonic Version Counter                  |
++-------------------------------------------------------------+
+                              |
+                              v (Extends Trust to)
++-------------------------------------------------------------+
+|                 RUNTIME SECURITY & ATTESTATION              |
+|  - Secure Enclaves / Measured Boot / Dynamic Trust          |
++-------------------------------------------------------------+
 ```
 
-### Boot Sequence Steps:
-1. **Power-On Reset (POR):** The processor core awakens and fetches its very first instruction vector directly from the immutable RoT memory space (e.g., internal Mask ROM or write-locked OTP memory).
-2. **Hardware State Initialization:** Critical security peripherals, watchdog timers, and secure RAM boundaries are configured.
-3. **Image Authentication:** The cryptographic verification engine reads the secondary boot image from external flash, computes its hash (e.g., SHA-256), and verifies the accompanying digital signature against the onboard immutable public key.
-4. **Execution Transfer:** 
-   * **On Success:** Control is handed over to the secondary bootloader entry point.
-   * **On Failure:** The system immediately aborts, locks down critical buses, logs a security fault, or falls back to a secure recovery mode.
+1. **Hardware RoT (HW-RoT):** The ultimate anchor embedded directly into silicon. It includes write-protected non-volatile storage for root public keys, device-unique identifiers (such as a hardware PUF or device ID), and hardwired state machines.
+2. **Boot RoT (Secure Boot):** The initial sequence executed out of the hardware RoT. It measures, verifies, and authenticates the secondary bootloader before allowing execution.
+3. **Runtime RoT:** Services post-boot that handle device attestation, secure storage decryption, and dynamic integrity monitoring.
 
 ---
 
-## ✨ Technical Specifications & Key Features
+## 3. The Boot Lifecycle & Chain of Trust
+The operational flow follows a strict sequential pipeline where trust is mathematically proven and extended from one stage to the next.
 
-* **Hardware-Enforced Immutability:** Designed to reside in write-protected storage or hardware fuse arrays to prevent persistent rootkit installation.
-* **Robust Cryptographic Engines:** Supports industry-standard algorithms including **SHA-256/SHA-384** for hashing and **ECDSA (secp256r1/ed25519)** or **RSA-3072** for signature verification.
-* **Anti-Rollback Protection:** Utilizes monotonic hardware/software counters (stored in secure non-volatile memory) to prevent attackers from flashing older, vulnerable firmware versions.
-* **Secure Key Management:** Strict hardware isolation of root public keys, device-unique secret seeds (e.g., PUF interfaces), and cryptographic scratchpads.
-* **Side-Channel & Fault Defenses:** Structured pipeline design addressing power analysis and fault-injection attack surface areas.
-
----
-
-## 📂 Repository Structure
-
-```text
-root-of-trust/
-├── docs/                   # Architecture specs, security threat models, and flow diagrams
-├── rtl/                    # Hardware description files (Verilog / SystemVerilog)
-│   ├── core/               # Main RoT state machine and control logic
-│   ├── crypto/             # Hardware hash and signature verification accelerators
-│   └── memory/             # Secure RAM / ROM controllers and bus wrappers
-├── firmware/               # Low-level secure bootloader code (C / Assembly / Rust)
-│   ├── bootrom/            # Stage 0 ROM image code
-│   └── drivers/            # Cryptographic library bindings and flash drivers
-├── scripts/                # Build automation, image signing, and key generation tools
-├── tests/                  # Verification testbenches, simulation scripts, and unit tests
-└── README.md               # Project documentation
-```
+### Step-by-Step Execution:
+1. **Power-On Reset (POR):** Upon power application, the Central Processing Unit (CPU) core awakens and fetches its very first instruction vector (`PC` register) exclusively from the immutable Boot ROM address space.
+2. **Cryptographic Image Verification:** Before running any external code, the RoT reads the secondary bootloader image from external flash storage, calculates its cryptographic hash (e.g., **SHA-256**), and verifies its digital signature (e.g., **ECDSA secp256r1** or **RSA-3072**) using the permanent public key stored in hardware fuses.
+3. **Branch Decision:**
+   * **Pass:** If verification succeeds, control is handed over to the secondary bootloader entry point.
+   * **Fail:** If verification fails or a signature mismatch occurs, the system immediately trips a hardware lockdown, clears internal RAM, and enters an infinite security halt or recovery loop.
+4. **Extending Trust:** The secondary bootloader repeats this validation process for the operating system kernel or application layer, forming an unbroken **Chain of Trust**.
 
 ---
 
-## 🚀 Getting Started
+## 4. Advanced Security Mechanisms
 
-### Prerequisites & Dependencies
-Ensure your development environment has the necessary toolchains installed depending on whether you are compiling the hardware RTL or the embedded firmware:
+### Anti-Rollback Protection
+Attackers frequently attempt to install older, vulnerable versions of firmware that contain known bugs. To prevent this:
+* The system maintains a **monotonic version counter** inside a secure write-once hardware register or fused memory cell.
+* During boot, the RoT extracts the version metadata from the incoming image. If the image version is lower than the hardware counter value, the image is automatically rejected.
 
-* **For Hardware (RTL):** 
-  * Verilator or ModelSim / QuestaSim for simulation
-  * Icarus Verilog (optional for lightweight testbenches)
-  * Make / CMake
-* **For Firmware & Scripts:**
-  * Python 3.10+ (for key generation and image signing automation scripts)
-  * OpenSSL or `cryptography` Python package
-  * Embedded GNU Toolchain (`arm-none-eabi-gcc` or `riscv64-unknown-elf-gcc`)
-
-### Cloning and Setup
-```bash
-# Clone the repository recursively to capture any submodules
-git clone https://github.com/your-username/root-of-trust.git
-cd root-of-trust
-
-# Install Python dependencies for build and signing scripts
-pip install -r scripts/requirements.txt
-```
+### Key Management & Isolation
+* **Private Keys:** Signing private keys are kept completely offline in highly secure Hardware Security Modules (HSMs).
+* **Public Keys:** Only the corresponding public keys or cryptographic fingerprints are burned permanently into device OTP fuses during manufacturing.
 
 ---
 
-## ⚙️ Building, Compiling & Simulation
+## 5. Threat Model & Mitigations
 
-### 1. Generating Test Keys and Signing an Image
-Before booting, firmware images must be signed using the private root key matching the public key embedded in the RoT.
-```bash
-# Generate a test private/public key pair
-python scripts/key_gen.py --output keys/
-
-# Sign a binary firmware image
-python scripts/sign_image.py --input build/firmware.bin --key keys/private.pem --output build/signed_firmware.bin
-```
-
-### 2. Compiling Firmware
-```bash
-cd firmware/bootrom
-make clean && make ARCH=arm
-```
-
----
-
-## 🧪 Testing, Verification & Testbenches
-
-The project includes automated regression tests covering positive boot paths and negative security exception paths:
-* **Valid Signature Test:** Ensures seamless handoff when a correctly signed image is presented.
-* **Corrupted Image Test:** Injects bit-flips into the binary to confirm that the RoT catches the mismatch and triggers a lock/abort state.
-* **Rollback Attack Test:** Attempts to load an image with an older version number to verify that the monotonic counter defense holds.
-
-Run the full verification suite using:
-```bash
-make test-all
-```
-
----
-
-## 🛡️ Security Considerations & Threat Mitigation
-
-* **Physical Attacks:** Designed with secure bus protocols and memory scrambling interfaces to deter probing and bus-sniffing.
-* **Fault Injection (FI):** Critical branch conditions utilize redundant checks and dual-rail logic flags to prevent voltage or clock glitching bypasses.
-* **Denial of Service (DoS):** Recovery loops are bounded by hardware watchdog timers to prevent infinite hanging states during authentication failures.
-
----
-
-## Contributing
-
-Contributions are highly encouraged to improve the cryptographic rigor, expand platform support, or harden verification coverage. 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/SecureFeature`)
-3. Commit your Changes (`git commit -m 'Add secure hardware watchdog timer'`)
-4. Push to the Branch (`git origin push feature/SecureFeature`)
-5. Open a Pull Request
-
----
+| Threat Vector | Description | Mitigation Strategy |
+| :--- | :--- | :--- |
+| **Firmware Tampering** | Modifying boot binaries in flash to introduce malware. | Mandatory cryptographic signature checks (ECDSA/RSA) prior to execution. |
+| **Rollback Attacks** | Forcing the device to execute an older, vulnerable firmware version. | Hardware monotonic version counters stored in secure OTP/fuses. |
+| **Physical Probing / Glitching** | Attempting to bypass branch instructions using voltage or clock glitches. | Dual-rail logic, redundant branch checks, and hardware watchdog timers. |
