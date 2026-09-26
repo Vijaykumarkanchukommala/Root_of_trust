@@ -1,0 +1,10 @@
+$RTL_PATH/sha256_core.sv
+$RTL_PATH/auth_engine.sv
+$RTL_PATH/boot_ctrl_fsm.sv
+$RTL_PATH/secure_key_storage.sv
+$RTL_PATH/root_top.sv
+$RTL_PATH/cput_reset_ctrl.sv
+$RTL_PATH/debug_ctrl.sv
+$RTL_PATH/policy_engine.sv
+$RTL_PATH/retry_counter.sv
+$RTL_PATH/lockdown_ctrl.sv
