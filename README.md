@@ -1,4 +1,5 @@
 # Root of Trust (RoT): Comprehensive Documentation & Conceptual Guide
+<img src="docs/root_of_trust.png" >
 
 ---
 
